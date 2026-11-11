@@ -404,15 +404,26 @@ if page == "Trang chủ":
 elif page == "Gợi ý cây trồng":
     saved = st.session_state.get("saved_in", {})
     for f in FEATS:
-        st.session_state.setdefault("in_" + f, saved.get(f, float(round(D["med"][f], 1))))
+        default_value = saved.get(f, float(round(D["med"][f], 1)))
+        st.session_state.setdefault("in_" + f, default_value)
+        st.session_state.setdefault("slider_" + f, st.session_state["in_" + f])
+
     st.markdown("## Gợi ý cây theo đất và khí hậu")
-    st.caption("Kết quả cập nhật mỗi khi bạn thay đổi giá trị.")
+    st.caption("Điều chỉnh bằng thanh trượt hoặc nhập trực tiếp giá trị. Kết quả cập nhật mỗi khi bạn thay đổi chỉ số.")
+
+    def sync_from_slider(f):
+        st.session_state["in_" + f] = st.session_state["slider_" + f]
+
+    def sync_from_number(f):
+        st.session_state["slider_" + f] = st.session_state["in_" + f]
 
     def quick():
         c = st.session_state.quick
         if c in NAME2KEY:
             for f in FEATS:
-                st.session_state["in_" + f] = float(round(D["rng"][NAME2KEY[c]][f][1], 1))
+                value = float(round(D["rng"][NAME2KEY[c]][f][1], 1))
+                st.session_state["in_" + f] = value
+                st.session_state["slider_" + f] = value
 
     left, right = st.columns([1, 1.5], gap="large")
     with left:
@@ -421,9 +432,36 @@ elif page == "Gợi ý cây trồng":
         st.selectbox("Điền nhanh bằng đất điển hình của một loại cây (tùy chọn)", ["— Tự nhập —"] + sorted(NAME2KEY), key="quick", on_change=quick)
         feats = FEATS if mode.startswith("Đất +") else SOIL
         vals = {}
+
         for f in feats:
             lo, hi, stp = LIMIT[f]
-            vals[f] = st.number_input(LBL[f], min_value=lo, max_value=hi, step=stp, key="in_" + f, format="%.1f")
+            with st.container(border=True):
+                st.markdown(f"**{LBL[f]}**")
+                st.caption(f"Giới hạn cho phép: {lo:g} – {hi:g}")
+                slider_col, input_col = st.columns([2, 1])
+                with slider_col:
+                    st.slider(
+                        "Điều chỉnh bằng thanh trượt",
+                        min_value=lo,
+                        max_value=hi,
+                        step=stp,
+                        key="slider_" + f,
+                        on_change=sync_from_slider,
+                        args=(f,),
+                    )
+                with input_col:
+                    st.number_input(
+                        "Hoặc nhập tay",
+                        min_value=lo,
+                        max_value=hi,
+                        step=stp,
+                        key="in_" + f,
+                        format="%.1f",
+                        on_change=sync_from_number,
+                        args=(f,),
+                    )
+                vals[f] = float(st.session_state["in_" + f])
+
         st.session_state.used_vals = vals
         st.session_state.saved_in = {f: st.session_state["in_" + f] for f in FEATS if "in_" + f in st.session_state}
     model = D["full"] if feats == FEATS else D["soil"]
