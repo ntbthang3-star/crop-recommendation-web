@@ -184,6 +184,7 @@ ALIAS = {"maize": ["corn", "bap"], "kidneybeans": ["kidney", "daudo"], "pigeonpe
          "watermelon": ["duahau"], "pomegranate": ["luu"], "rice": ["gao", "paddy"], "orange": ["cam"]}
 
 
+
 def norm(s):
     s = unicodedata.normalize("NFD", s.lower().replace("đ", "d"))
     return re.sub(r"[^a-z0-9]", "", "".join(c for c in s if unicodedata.category(c) != "Mn"))
@@ -218,6 +219,23 @@ def photo(path, w, h):
 
 
 IMGS = find_images()
+
+def home_bg(w=1400, h=560):
+    """Lấy ảnh nền trang chủ từ thư mục 22 ảnh."""
+    folder = os.path.join(BASE, "22 ảnh")
+
+    if os.path.isdir(folder):
+        for fn in os.listdir(folder):
+            stem, ext = os.path.splitext(fn)
+
+            if norm(stem) == norm("ảnh nền") and ext.lower() in IMG_EXT:
+                p = os.path.join(folder, fn)
+                try:
+                    return f"background-image:url('{photo(p, w, h)}')"
+                except Exception:
+                    break
+
+    return "background-image:linear-gradient(135deg,#355a3d,#86a566)"
 
 
 def bg(k, w=640, h=480):
