@@ -404,12 +404,14 @@ if page == "Trang chủ":
 elif page == "Gợi ý cây trồng":
     saved = st.session_state.get("saved_in", {})
     for f in FEATS:
-        default_value = saved.get(f, float(round(D["med"][f], 1)))
-        st.session_state.setdefault("in_" + f, default_value)
-        st.session_state.setdefault("slider_" + f, st.session_state["in_" + f])
+        lo, hi = D["ax"][f]
+        default = float(round(D["med"][f], 1))
+        initial = min(max(float(saved.get(f, default)), lo), hi)
+        st.session_state.setdefault("in_" + f, initial)
+        st.session_state.setdefault("slider_" + f, initial)
 
     st.markdown("## Gợi ý cây theo đất và khí hậu")
-    st.caption("Điều chỉnh bằng thanh trượt hoặc nhập trực tiếp giá trị. Kết quả cập nhật mỗi khi bạn thay đổi chỉ số.")
+    st.caption("Kết quả cập nhật mỗi khi bạn thay đổi giá trị. Mỗi chỉ số có thể kéo thanh trượt hoặc nhập trực tiếp.")
 
     def sync_from_slider(f):
         st.session_state["in_" + f] = st.session_state["slider_" + f]
@@ -421,7 +423,9 @@ elif page == "Gợi ý cây trồng":
         c = st.session_state.quick
         if c in NAME2KEY:
             for f in FEATS:
+                lo, hi = D["ax"][f]
                 value = float(round(D["rng"][NAME2KEY[c]][f][1], 1))
+                value = min(max(value, lo), hi)
                 st.session_state["in_" + f] = value
                 st.session_state["slider_" + f] = value
 
@@ -434,33 +438,34 @@ elif page == "Gợi ý cây trồng":
         vals = {}
 
         for f in feats:
-            lo, hi, stp = LIMIT[f]
+            lo, hi = D["ax"][f]
+            stp = LIMIT[f][2]
             with st.container(border=True):
                 st.markdown(f"**{LBL[f]}**")
-                st.caption(f"Giới hạn cho phép: {lo:g} – {hi:g}")
-                slider_col, input_col = st.columns([2, 1])
+                st.caption(f"Giới hạn mô hình đã học: {vn(lo)} đến {vn(hi)}")
+                slider_col, number_col = st.columns([1.35, 1])
                 with slider_col:
                     st.slider(
-                        "Điều chỉnh bằng thanh trượt",
-                        min_value=lo,
-                        max_value=hi,
-                        step=stp,
+                        "Kéo để chọn giá trị",
+                        min_value=float(lo),
+                        max_value=float(hi),
+                        step=float(stp),
                         key="slider_" + f,
                         on_change=sync_from_slider,
                         args=(f,),
                     )
-                with input_col:
+                with number_col:
                     st.number_input(
-                        "Hoặc nhập tay",
-                        min_value=lo,
-                        max_value=hi,
-                        step=stp,
+                        "Hoặc nhập trực tiếp",
+                        min_value=float(lo),
+                        max_value=float(hi),
+                        step=float(stp),
                         key="in_" + f,
                         format="%.1f",
                         on_change=sync_from_number,
                         args=(f,),
                     )
-                vals[f] = float(st.session_state["in_" + f])
+            vals[f] = st.session_state["in_" + f]
 
         st.session_state.used_vals = vals
         st.session_state.saved_in = {f: st.session_state["in_" + f] for f in FEATS if "in_" + f in st.session_state}
@@ -471,13 +476,13 @@ elif page == "Gợi ý cây trồng":
     k1, p1 = top[0]
     with right:
         lvl = ("hi", "Độ tin cậy cao") if p1 >= 0.7 else ("mid", "Độ tin cậy trung bình") if p1 >= 0.4 else ("lo", "Độ tin cậy thấp")
-        H(f"<div class='rescard' style=\"{bg(k1, 900, 580)}\"><div class='ov'></div><span class='pill {lvl[0]}'>{pc(p1, 0)} · {lvl[1]}</span>"
+        H(f'<div class="rescard" style="{bg(k1, 900, 580)}"><div class="ov"></div><span class="pill {lvl[0]}">{pc(p1, 0)} · {lvl[1]}</span>'
           f"<div class='tx'><div class='rk'>GỢI Ý SỐ 1</div><h2>{vi(k1)}</h2><div class='la'>{CROPS[k1][1]}</div></div></div>")
         st.button(f"Xem cách trồng {vi(k1).lower()}", type="primary", on_click=go, args=("Cách trồng", k1), key="r1")
         c2_, c3_ = st.columns(2)
         for col, (k, p), rk in zip((c2_, c3_), top[1:3], (2, 3)):
             with col:
-                H(f"<div class='pcard sm' style=\"{bg(k, 480, 300)}\"><div class='ov'></div><span class='pp'>{pc(p, 0)}</span>"
+                H(f'<div class="pcard sm" style="{bg(k, 480, 300)}"><div class="ov"></div><span class="pp">{pc(p, 0)}</span>'
                   f"<div class='tx'><div class='la'>HẠNG {rk}</div><div class='nm'>{vi(k)}</div></div></div>")
                 st.button("Xem cách trồng", on_click=go, args=("Cách trồng", k), key=f"r{rk}")
         for f in feats:
@@ -492,7 +497,7 @@ elif page == "Gợi ý cây trồng":
     a, b = st.columns([1, 1.4], gap="large")
     with a:
         st.markdown("##### Xác suất của 5 cây đứng đầu")
-        H("".join(f"<div class='bar'><span class='th' style=\"{bg(k, 60, 60)}\"></span><span class='l'>{vi(k)}</span><span class='t'><div class='f' style='width:{p * 100:.1f}%'></div></span><span class='v'>{pc(p, 0)}</span></div>" for k, p in top[:5]))
+        H("".join(f'<div class="bar"><span class="th" style="{bg(k, 60, 60)}"></span><span class="l">{vi(k)}</span><span class="t"><div class="f" style="width:{p * 100:.1f}%"></div></span><span class="v">{pc(p, 0)}</span></div>' for k, p in top[:5]))
     with b:
         st.markdown(f"##### Số liệu của bạn so với điều kiện điển hình của {vi(k1).lower()}")
         compare(k1, vals)
